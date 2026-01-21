@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mood2Music</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        background: #f4f4f9;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      .upload-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      /* Preview Image */
+      #preview {
+        max-width: 100%;
+        max-height: 300px;
+        margin-top: 1rem;
+        border-radius: 4px;
+        display: none;
+      }
+
+      /* Button */
+      button {
+        background: #6200ea;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 1rem;
+      }
+      button:hover {
+        background: #3700b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      /* Results Area */
+      #results {
+        margin-top: 2rem;
+        display: none;
+      }
+      .mood-badge {
+        display: inline-block;
+        background: #03dac6;
+        color: #000;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
+
+      /* Song Cards */
+      .track {
+        background: white;
+        border-left: 5px solid #6200ea;
+        padding: 1rem;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .track-info h3 {
+        margin: 0 0 5px 0;
+        font-size: 1.1rem;
+      }
+      .track-info p {
+        margin: 0;
+        color: #666;
+        font-size: 0.9rem;
+      }
+      audio {
+        height: 30px;
+        width: 200px;
+      }
+      .link-btn {
+        text-decoration: none;
+        color: #6200ea;
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin-left: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎵 Mood2Music</h1>
+
+    <div class="upload-container">
+      <input type="file" id="fileInput" accept="image/*" />
+      <br />
+      <img id="preview" alt="Image Preview" />
+      <br />
+      <button id="analyzeBtn" onclick="analyzeImage()">Analyze Mood</button>
+    </div>
+
+    <div id="results">
+      <h2>Detected Mood: <span id="moodDisplay" class="mood-badge"></span></h2>
+      <p><strong>OCR Text:</strong> <em id="ocrText"></em></p>
+      <div id="trackList"></div>
+    </div>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const preview = document.getElementById("preview");
+      const analyzeBtn = document.getElementById("analyzeBtn");
+
+      // Show image preview when selected
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        if (file) {
+          preview.src = URL.createObjectURL(file);
+          preview.style.display = "inline-block";
+        }
+      });
+
+      async function analyzeImage() {
+        const file = fileInput.files[0];
+        if (!file) return alert("Please select an image first!");
+
+        // UI Feedback
+        analyzeBtn.textContent = "Analyzing...";
+        analyzeBtn.disabled = true;
+        document.getElementById("results").style.display = "none";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("/analyze", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error("Analysis failed");
+
+          const data = await response.json();
+          displayResults(data);
+        } catch (error) {
+          alert("Error: " + error.message);
+        } finally {
+          analyzeBtn.textContent = "Analyze Mood";
+          analyzeBtn.disabled = false;
+        }
+      }
+
+      function displayResults(data) {
+        document.getElementById("results").style.display = "block";
+        document.getElementById("moodDisplay").textContent = data.detected_mood;
+        document.getElementById("ocrText").textContent =
+          '"' + data.ocr_text_preview + '"';
+
+        const trackList = document.getElementById("trackList");
+        trackList.innerHTML = ""; // Clear old results
+
+        data.recommendations.forEach((track) => {
+          const div = document.createElement("div");
+          div.className = "track";
+          div.innerHTML = `
+                    <div class="track-info">
+                        <h3>${track.name}</h3>
+                        <p>${track.artist}</p>
+                    </div>
+                    <div>
+                        ${track.preview_url ? `<audio controls src="${track.preview_url}"></audio>` : "<small>No Preview</small>"}
+                        <a href="${track.url}" target="_blank" class="link-btn">Open ↗</a>
+                    </div>
+                `;
+          trackList.appendChild(div);
+        });
+      }
+    </script>
+  </body>
+</html>
